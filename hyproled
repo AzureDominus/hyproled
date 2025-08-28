@@ -2,7 +2,7 @@
 shift=false; invert=false; monitor=0
 fill_color='0.0,0.0,0.0,1.0'
 
-STATE_FILE="/tmp/hyproled_shift.state"
+STATE_FILE="/dev/shm/hyproled_shift.state"
 SHADER_FILE="/dev/shm/hyproled_shader.glsl"
 
 show_help(){
@@ -11,7 +11,7 @@ Usage: $(basename $0) [OPTION]... [off]
 
 Hyprland shader utility to prevent OLED burn in.
 
-version: 0.1.2
+version: 0.1.3
 
 Options:
   -a x:y:w:h  The effective area. Useful for bars. [Default: The entire screen]
@@ -33,26 +33,21 @@ fi
 while getopts ":a:ism:h" opt; do
   case $opt in
     a) area=$OPTARG ;;
-    s) shift=true ;;
     i) invert=true ;;
+    s) shift=true ;;
     m) monitor=$OPTARG ;;
-    h) show_help; exit ;;
+    h) show_help; exit 0 ;;
     *) show_help; exit 1 ;;
   esac
 done
 shift $((OPTIND-1))
 
 
-# Only use shift if -s is passed
+# Compute shift offset
 if $shift; then
-  # Read last state, default to 0
-  if [[ -f $STATE_FILE ]]; then
-    last_shift=$(<"$STATE_FILE")
-  else
-    last_shift=0
-  fi
-  # Toggle state
-  if [[ $last_shift -eq 0 ]]; then
+  last_shift=0
+  [[ -f $STATE_FILE ]] && read -r last_shift < "$STATE_FILE"
+  if (( last_shift == 0 )); then
     shift_offset=1
     echo 1 > "$STATE_FILE"
   else
@@ -63,11 +58,7 @@ else
   shift_offset=0
 fi
 
-
-
-# Base shader header
-cat > "$SHADER_FILE" <<EOF
-#version 300 es
+shader_code="#version 300 es
 precision highp float;
 in vec2 v_texcoord;
 uniform sampler2D tex;
@@ -78,28 +69,33 @@ void main(){
   if(wl_output != ${monitor}) { fragColor = orig; return; }
   vec2 fc = gl_FragCoord.xy;
   bool even = mod(fc.x + fc.y + float(${shift_offset}),2.0)==0.0;
-EOF
+  vec4 pixel = even ? orig : vec4(${fill_color});
+"
 
-echo "  vec4 pixel = even ? orig : vec4(${fill_color});" >> "$SHADER_FILE"
-
-# Region logic
 if [[ -n $area ]]; then
   if [[ $area =~ ^([0-9]+):([0-9]+):([0-9]+):([0-9]+)$ ]]; then
     read x y w h <<< "${BASH_REMATCH[*]:1:4}"
-    echo "  bool inRegion = (fc.x >= ${x}.0 && fc.x <= (${x}.0+${w}.0) && fc.y >= ${y}.0 && fc.y <= (${y}.0+${h}.0));" >> "$SHADER_FILE"
+    shader_code+="  bool inRegion = (fc.x >= ${x}.0 && fc.x <= (${x}.0+${w}.0) && fc.y >= ${y}.0 && fc.y <= (${y}.0+${h}.0));
+"
     if $invert; then
-      echo "  fragColor = inRegion ? orig : pixel;" >> "$SHADER_FILE"
+      shader_code+="  fragColor = inRegion ? orig : pixel;
+"
     else
-      echo "  fragColor = inRegion ? pixel : orig;" >> "$SHADER_FILE"
+      shader_code+="  fragColor = inRegion ? pixel : orig;
+"
     fi
-    echo "}" >> "$SHADER_FILE"
+    shader_code+="}
+"
   else
     echo "Invalid area format, use x:y:w:h" >&2; exit 1
   fi
 else
-  echo "  fragColor = pixel;" >> "$SHADER_FILE"
-  echo "}" >> "$SHADER_FILE"
+  shader_code+="  fragColor = pixel;
+}
+"
 fi
+
+echo "$shader_code" > "$SHADER_FILE"
 
 
 hyprctl keyword decoration:screen_shader "$SHADER_FILE"
