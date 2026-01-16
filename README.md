@@ -59,7 +59,6 @@ function handle {
   case $1 in
     'fullscreen>>1') hyproled off ;;
     'fullscreen>>0') hyproled -a 0:0:2880:50 ;;
- ;;
   esac
 }
 
