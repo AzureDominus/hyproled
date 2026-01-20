@@ -26,7 +26,7 @@ EOF
 }
 
 if [[ $1 == off ]]; then
-  hyprctl --instace 0 keyword decoration:screen_shader ""
+  hyprctl --instance 0 keyword decoration:screen_shader ""
   exit 0
 fi
 
@@ -98,4 +98,4 @@ fi
 echo "$shader_code" > "$SHADER_FILE"
 
 
-hyprctl --instace 0 keyword decoration:screen_shader "$SHADER_FILE"
+hyprctl --instance 0 keyword decoration:screen_shader "$SHADER_FILE"
