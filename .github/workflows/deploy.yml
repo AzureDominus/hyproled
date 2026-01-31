@@ -100,20 +100,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to AUR
-        if: secrets.AUR_SSH_KEY != ''
+        if: secrets.AUR_SSH_KEY
         env:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
         run: |
-          # Install required packages for AUR deployment
-          sudo apt-get update -qq
-          sudo apt-get install -y pacman-package-manager || {
-            # If pacman-package-manager is not available, install minimal makepkg dependencies
-            echo "Installing makepkg dependencies..."
-            # Create a minimal makepkg wrapper
-            sudo mkdir -p /usr/local/bin
-            cat << 'MAKEPKG_SCRIPT' | sudo tee /usr/local/bin/makepkg > /dev/null
+          # Install minimal makepkg wrapper for .SRCINFO generation
+          echo "Installing makepkg wrapper..."
+          sudo mkdir -p /usr/local/bin
+          cat << 'MAKEPKG_SCRIPT' | sudo tee /usr/local/bin/makepkg > /dev/null
           #!/bin/bash
           # Minimal makepkg --printsrcinfo implementation for CI
+          # Note: This sources PKGBUILD which is necessary but should only be used with trusted PKGBUILDs
           if [[ "$1" == "--printsrcinfo" ]]; then
             source PKGBUILD
             echo "pkgbase = ${pkgbase:-$pkgname}"
@@ -121,8 +118,8 @@ jobs:
             echo "	pkgver = $pkgver"
             echo "	pkgrel = $pkgrel"
             echo "	url = $url"
-            echo "	arch = ${arch[@]}"
-            [[ -n "$license" ]] && echo "	license = ${license[@]}"
+            [[ -n "$arch" ]] && for a in "${arch[@]}"; do echo "	arch = $a"; done
+            [[ -n "$license" ]] && for l in "${license[@]}"; do echo "	license = $l"; done
             [[ -n "$depends" ]] && for dep in "${depends[@]}"; do echo "	depends = $dep"; done
             [[ -n "$makedepends" ]] && for dep in "${makedepends[@]}"; do echo "	makedepends = $dep"; done
             [[ -n "$source" ]] && for src in "${source[@]}"; do echo "	source = $src"; done
@@ -130,12 +127,11 @@ jobs:
             echo "pkgname = ${pkgname}"
           fi
           MAKEPKG_SCRIPT
-            sudo chmod +x /usr/local/bin/makepkg
-          }
+          sudo chmod +x /usr/local/bin/makepkg
           
           # Setup SSH for AUR
           mkdir -p ~/.ssh
-          echo "$AUR_SSH_KEY" > ~/.ssh/aur
+          printf '%s\n' "$AUR_SSH_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
           
           # Add AUR host key to known_hosts for security

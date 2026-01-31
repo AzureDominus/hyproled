@@ -20,9 +20,9 @@ This workflow automates the process of:
 2. Select the **Deploy to AUR and Create Release** workflow
 3. Click **Run workflow**
 4. Choose the version bump type:
-   - **patch**: Increment the patch version (0.1.3 → 0.1.4)
-   - **minor**: Increment the minor version (0.1.3 → 0.2.0)
-   - **major**: Increment the major version (0.1.3 → 1.0.0)
+   - **patch**: Increment the patch version (e.g., X.Y.Z → X.Y.Z+1)
+   - **minor**: Increment the minor version (e.g., X.Y.Z → X.Y+1.0)
+   - **major**: Increment the major version (e.g., X.Y.Z → X+1.0.0)
 5. Click **Run workflow** to start the deployment
 
 ### Required Secrets
@@ -54,7 +54,7 @@ This is the SSH private key used to authenticate with the AUR repository.
 ### What the Workflow Does
 
 1. **Version Bump**: Updates the version number in the `hyproled` script based on your selection
-2. **Git Tag**: Creates and pushes a new Git tag (e.g., `v0.1.4`)
+2. **Git Tag**: Creates and pushes a new Git tag (e.g., `vX.Y.Z`)
 3. **GitHub Release**: Creates a new GitHub release with:
    - Release notes
    - Installation instructions
@@ -71,9 +71,10 @@ If you prefer to deploy manually:
 
 1. Update version in `hyproled`:
    ```bash
-   sed -i 's/version: 0.1.3/version: 0.1.4/' hyproled
-   git commit -am "Bump version to 0.1.4"
-   git tag -a v0.1.4 -m "Release v0.1.4"
+   # Example: update the version line in the script
+   sed -i 's/version: X.Y.Z/version: X.Y.ZNEW/' hyproled
+   git commit -am "Bump version to X.Y.ZNEW"
+   git tag -a vX.Y.ZNEW -m "Release vX.Y.ZNEW"
    git push && git push --tags
    ```
 
@@ -83,10 +84,10 @@ If you prefer to deploy manually:
    ```bash
    git clone ssh://aur@aur.archlinux.org/hyproled-git.git
    cd hyproled-git
-   # Update PKGBUILD
+   # Update PKGBUILD (increment pkgrel)
    makepkg --printsrcinfo > .SRCINFO
    git add PKGBUILD .SRCINFO
-   git commit -m "Update to version 0.1.4"
+   git commit -m "Update to version X.Y.ZNEW"
    git push
    ```
 
