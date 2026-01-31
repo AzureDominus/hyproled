@@ -100,21 +100,52 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to AUR
-        if: ${{ secrets.AUR_SSH_KEY != '' }}
+        if: secrets.AUR_SSH_KEY != ''
         env:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
         run: |
+          # Install required packages for AUR deployment
+          sudo apt-get update -qq
+          sudo apt-get install -y pacman-package-manager || {
+            # If pacman-package-manager is not available, install minimal makepkg dependencies
+            echo "Installing makepkg dependencies..."
+            # Create a minimal makepkg wrapper
+            sudo mkdir -p /usr/local/bin
+            cat << 'MAKEPKG_SCRIPT' | sudo tee /usr/local/bin/makepkg > /dev/null
+          #!/bin/bash
+          # Minimal makepkg --printsrcinfo implementation for CI
+          if [[ "$1" == "--printsrcinfo" ]]; then
+            source PKGBUILD
+            echo "pkgbase = ${pkgbase:-$pkgname}"
+            echo "	pkgdesc = $pkgdesc"
+            echo "	pkgver = $pkgver"
+            echo "	pkgrel = $pkgrel"
+            echo "	url = $url"
+            echo "	arch = ${arch[@]}"
+            [[ -n "$license" ]] && echo "	license = ${license[@]}"
+            [[ -n "$depends" ]] && for dep in "${depends[@]}"; do echo "	depends = $dep"; done
+            [[ -n "$makedepends" ]] && for dep in "${makedepends[@]}"; do echo "	makedepends = $dep"; done
+            [[ -n "$source" ]] && for src in "${source[@]}"; do echo "	source = $src"; done
+            echo ""
+            echo "pkgname = ${pkgname}"
+          fi
+          MAKEPKG_SCRIPT
+            sudo chmod +x /usr/local/bin/makepkg
+          }
+          
           # Setup SSH for AUR
           mkdir -p ~/.ssh
           echo "$AUR_SSH_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
+          
+          # Add AUR host key to known_hosts for security
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
           
           # Configure SSH to use the key for AUR
           cat >> ~/.ssh/config <<EOF
           Host aur.archlinux.org
             IdentityFile ~/.ssh/aur
             User aur
-            StrictHostKeyChecking no
           EOF
           
           # Clone AUR repository
