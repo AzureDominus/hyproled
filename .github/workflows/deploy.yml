@@ -102,7 +102,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Deploy to AUR
-        if: secrets.AUR_SSH_KEY
+        if: ${{ secrets.AUR_SSH_KEY != '' }}
         env:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
         run: |
