@@ -65,6 +65,15 @@ function handle {
 socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock | while read -r line; do handle "$line"; done
 ```
 
+## Development & Deployment
+
+For maintainers: This repository includes an automated deployment workflow for releasing new versions.
+
+See [`.github/DEPLOYMENT.md`](.github/DEPLOYMENT.md) for detailed instructions on:
+- Using the GitHub Actions workflow to create releases
+- Deploying to AUR (Arch User Repository)
+- Setting up required secrets and permissions
+
 ## Backlog
 
 - Multiple areas
