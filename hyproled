@@ -67,8 +67,13 @@ layout(location = 0) out vec4 fragColor;
 void main(){
   vec4 orig = texture(tex, v_texcoord);
   if(wl_output != ${monitor}) { fragColor = orig; return; }
-  vec2 fc = gl_FragCoord.xy;
-  bool even = mod(fc.x + fc.y + float(${shift_offset}),2.0)==0.0;
+  // Don't use gl_FragCoord here: Hyprland may render the screen_shader only for
+  // damaged regions, which can shift the viewport and make gl_FragCoord local.
+  // v_texcoord stays stable and maps to the full output texture.
+  ivec2 texSize = textureSize(tex, 0);
+  vec2 fc = v_texcoord * vec2(texSize);
+  ivec2 ip = clamp(ivec2(fc), ivec2(0), texSize - ivec2(1));
+  bool even = ((ip.x + ip.y + ${shift_offset}) & 1) == 0;
   vec4 pixel = even ? orig : vec4(${fill_color});
 "
 
