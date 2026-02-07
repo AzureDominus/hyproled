@@ -4,6 +4,49 @@ fill_color='0.0,0.0,0.0,1.0'
 
 STATE_FILE="/dev/shm/hyproled_shift.state"
 SHADER_FILE="/dev/shm/hyproled_shader.glsl"
+DT_STATE_FILE="/dev/shm/hyproled_damage_tracking.state"
+
+get_damage_tracking_mode() {
+  # hyprctl prints:
+  #   int: 2
+  #   set: false
+  hyprctl --instance 0 getoption debug:damage_tracking 2>/dev/null | awk '/^int:/ { print $2; exit }'
+}
+
+set_damage_tracking_mode() {
+  hyprctl --instance 0 keyword debug:damage_tracking "$1" >/dev/null 2>&1
+}
+
+maybe_enable_damage_workaround() {
+  # With full damage tracking (2), Hyprland may leave stale pixels for some
+  # transparent / overlay compositions + screen_shader, which shows up as
+  # "glitchy" regions until a full redraw happens. Switching to monitor mode (1)
+  # forces a full monitor repaint when anything changes, but still allows VFR.
+  [[ -f "$DT_STATE_FILE" ]] && return 0
+
+  local cur
+  cur="$(get_damage_tracking_mode)"
+  [[ -z "$cur" ]] && return 0
+
+  if [[ "$cur" == "2" ]]; then
+    echo "$cur" > "$DT_STATE_FILE"
+    set_damage_tracking_mode 1
+  fi
+}
+
+maybe_restore_damage_workaround() {
+  [[ -f "$DT_STATE_FILE" ]] || return 0
+
+  local prev cur
+  read -r prev < "$DT_STATE_FILE" || prev=""
+  rm -f "$DT_STATE_FILE"
+
+  # Only restore if we're still on the mode we set, otherwise assume the user
+  # changed it manually and don't fight them.
+  cur="$(get_damage_tracking_mode)"
+  [[ -z "$prev" ]] && return 0
+  [[ "$cur" == "1" ]] && set_damage_tracking_mode "$prev"
+}
 
 show_help(){
   cat <<EOF
@@ -27,6 +70,7 @@ EOF
 
 if [[ $1 == off ]]; then
   hyprctl --instance 0 keyword decoration:screen_shader ""
+  maybe_restore_damage_workaround
   exit 0
 fi
 
@@ -41,6 +85,8 @@ while getopts ":a:ism:h" opt; do
   esac
 done
 shift $((OPTIND-1))
+
+maybe_enable_damage_workaround
 
 
 # Compute shift offset
